@@ -4,9 +4,45 @@ import { AccountRepository } from "../repositories/AccountRepository"
 
 export class AccountController {
 
-  async create(req: Request, res: Response) {
+  async index(_: Request, response: Response) {
     try {
-      const { name, expiration_day, active } = req.body
+      const repository = getCustomRepository(AccountRepository)
+      
+      const registries = await repository.find()
+      
+      return response.json(registries)
+    }
+    catch(error) {
+      return response.status(500).json({ error: error.message })
+    }
+  }
+
+  async show(request: Request, response: Response) {
+    try {
+      const { id } = request.params
+
+      if (!id) {
+        return response.status(500).json({ error: 'Account not provided!' })
+      }
+
+      const repository = getCustomRepository(AccountRepository)
+      
+      const registry = await repository.findOne(id)
+
+      if (!registry) {
+        return response.status(500).json({ error: 'Account not found!' })
+      }
+      
+      return response.json(registry)
+    }
+    catch(error) {
+      return response.status(500).json({ error: error.message })
+    }
+  }
+
+  async create(request: Request, response: Response) {
+    try {
+      const { name, expiration_day, active } = request.body
 
       const accountRepository = getCustomRepository(AccountRepository)
 
@@ -15,7 +51,7 @@ export class AccountController {
       })
 
       if (account) {
-        return res.status(400).json({
+        return response.status(400).json({
           error: 'Account already exists!'
         })
       }
@@ -28,24 +64,18 @@ export class AccountController {
 
       await accountRepository.save(newAccount)
 
-      return res.status(201).json(newAccount)
+      return response.status(201).json(newAccount)
     }
     catch(error) {
-      return res.status(500).json(error)
+      return response.status(500).json({ error: error.message })
     }
-  }
-
-  async index(_: Request, response: Response) {
-    const repository = getCustomRepository(AccountRepository)
-
-    const registries = await repository.find()
-
-    return response.json(registries)
   }
 
   async destroy(request: Request, response: Response) {
-    const { id } = request.body
-    const isDeleteAll = id==='all'
+    const { id } = request.params
+
+    const isDeleteAll = id === undefined
+
     const scope = isDeleteAll ? {} : { id }
 
     const repository = getCustomRepository(AccountRepository)

@@ -5,99 +5,136 @@ import { EntryRepository } from '../repositories/EntryRepository'
 import { validate } from 'uuid'
 
 export class EntryController {
-  async create(request: Request, response: Response) {
-    const { expiration: expirationParam, account: accountParam, value, code, payed } = request.body
-
-    if (!accountParam) {
-      return response.status(400).json({ error: 'Account not provided!' })
-    }
-
-    let expiration_day: number
-    if (expirationParam) {
-      expiration_day = Number(String(expirationParam).substr(-2))
-    }
-
-    const accountRepository = getCustomRepository(AccountRepository)
-    
-    let account: any
-    
-    if (validate(accountParam)) {
-      account = await accountRepository.findOne(accountParam)
+  async index(_: Request, response: Response) {
+    try {
+      const entryRepository = getCustomRepository(EntryRepository)
       
-      if (!account) {
-        return response.status(404).json({ error: 'Account does not exists!' })
-      }
+      const entries = await entryRepository.find({
+        relations: ['account'],
+      })
+      
+      return response.json(entries)
     }
-    else {
-      account = await accountRepository.findOne({ name: Like(accountParam) })
+    catch (error) {
+      return response.status(500).json({ error: error.message })
+    }
+  }
 
-      if (account) {
-        if (!expirationParam) {
-          expiration_day = account.expiration_day
+  async show(request: Request, response: Response) {
+    try {
+      const { id } = request.params
+
+      if (!id) {
+        return response.status(400).json({ error: 'Entry not provided!' })
+      }
+
+      const entryRepository = getCustomRepository(EntryRepository)
+      
+      const entry = await entryRepository.findOne({
+        where: { id },
+        relations: ['account'],
+      })
+
+      if (!entry) {
+        return response.status(404).json({ error: 'Entry not found!' })
+      }
+      
+      return response.json(entry)
+    }
+    catch (error) {
+      return response.status(500).json({ error: error.message })
+    }
+  }
+
+  async create(request: Request, response: Response) {
+    try {
+      const { expiration: expirationParam, account: accountParam, value, code, payed } = request.body
+      
+      if (!accountParam) {
+        return response.status(400).json({ error: 'Account not provided!' })
+      }
+      
+      let expiration_day: number
+      if (expirationParam) {
+        expiration_day = Number(String(expirationParam).substr(-2))
+      }
+      
+      const accountRepository = getCustomRepository(AccountRepository)
+      
+      let account: any
+      
+      if (validate(accountParam)) {
+        account = await accountRepository.findOne(accountParam)
+        
+        if (!account) {
+          return response.status(404).json({ error: 'Account does not exists!' })
         }
       }
       else {
-        account = accountRepository.create({
-          name: accountParam,
-          expiration_day,
-        })
-        await accountRepository.save(account)
+        account = await accountRepository.findOne({ name: Like(accountParam) })
+        
+        if (account) {
+          if (!expirationParam) {
+            expiration_day = account.expiration_day
+          }
+        }
+        else {
+          account = accountRepository.create({
+            name: accountParam,
+            expiration_day,
+          })
+          await accountRepository.save(account)
+        }
       }
+      
+      const entryRepository = getCustomRepository(EntryRepository)
+      
+      const date = new Date()
+      
+      let expiration: string = null
+      
+      if (expirationParam && String(expirationParam).indexOf('-')>-1) {
+        expiration = expirationParam
+      }
+      else if (expirationParam !== null) {
+        expiration = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(expiration_day ?? date.getDate()).padStart(2,'0')}`
+      }
+      
+      const entry = await entryRepository.findOne({
+        where: [
+          { 
+            expiration, 
+            account_id: account.id 
+          },
+          { code },
+        ],
+      })
+      
+      if (entry) {
+        return response.status(400).json({ error: 'Entry already exists!' })
+      }
+      
+      const newEntry = entryRepository.create({
+        expiration,
+        account,
+        value,
+        code,
+        payed,
+      })
+      
+      await entryRepository.save(newEntry)
+      
+      return response.status(201).json(newEntry)
     }
-    
-    const entryRepository = getCustomRepository(EntryRepository)
-    
-    const date = new Date()
-    
-    let expiration: string = null
-
-    if (expirationParam && String(expirationParam).indexOf('-')>-1) {
-      expiration = expirationParam
+    catch (error) {
+      return response.status(500).json({ error: error.message })
     }
-    else if (expirationParam !== null) {
-      expiration = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(expiration_day ?? date.getDate()).padStart(2,'0')}`
-    }
-
-    const entry = await entryRepository.findOne({
-      where: [
-        { 
-          expiration, 
-          account_id: account.id 
-        },
-        { code },
-      ],
-    })
-
-    if (entry) {
-      return response.status(400).json({ error: 'Entry already exists!' })
-    }
-
-    const newEntry = entryRepository.create({
-      expiration,
-      account,
-      value,
-      code,
-      payed,
-    })
-
-    await entryRepository.save(newEntry)
-
-    return response.status(201).json(newEntry)
   }
-
-  async index(_: Request, response: Response) {
-    const entryRepository = getCustomRepository(EntryRepository)
-
-    const entries = await entryRepository.find({
-      relations: ['account'],
-    })
-
-    return response.json(entries)
-  }
-
+    
   async destroy(request: Request, response: Response) {
-    const { id } = request.body
-    const isDeleteAll = id==='all'
+    const { id } = request.params
+
+    const isDeleteAll = id === undefined
     const scope = isDeleteAll ? {} : { id }
 
     const entryRepository = getCustomRepository(EntryRepository)
@@ -124,7 +161,7 @@ export class EntryController {
         message: `${ isDeleteAll ? 'Entries' : 'Entry'} successfully deleted!`
       })
     }
-    catch(error) {
+    catch (error) {
       return response.status(500).json({ error: error.message })
     }
   }
