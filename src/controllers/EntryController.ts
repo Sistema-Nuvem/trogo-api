@@ -1,51 +1,15 @@
 import { Request, Response } from 'express'
 import { getCustomRepository, Like } from 'typeorm'
+import { validate } from 'uuid'
+import * as yup from 'yup'
+
+import { schemaConfig } from '../config/schema'
+
 import { AccountRepository } from '../repositories/AccountRepository'
 import { EntryRepository } from '../repositories/EntryRepository'
-import { validate } from 'uuid'
+import { momentDate } from '../validations/momentDate'
 
 export class EntryController {
-  async index(_: Request, response: Response) {
-    try {
-      const entryRepository = getCustomRepository(EntryRepository)
-      
-      const entries = await entryRepository.find({
-        relations: ['account'],
-      })
-      
-      return response.json(entries)
-    }
-    catch (error) {
-      return response.status(500).json({ error: error.message })
-    }
-  }
-
-  async show(request: Request, response: Response) {
-    try {
-      const { id } = request.params
-
-      if (!id) {
-        return response.status(400).json({ error: 'Entry not provided!' })
-      }
-
-      const entryRepository = getCustomRepository(EntryRepository)
-      
-      const entry = await entryRepository.findOne({
-        where: { id },
-        relations: ['account'],
-      })
-
-      if (!entry) {
-        return response.status(404).json({ error: 'Entry not found!' })
-      }
-      
-      return response.json(entry)
-    }
-    catch (error) {
-      return response.status(500).json({ error: error.message })
-    }
-  }
-
   async create(request: Request, response: Response) {
     try {
       const { expiration: expirationParam, account: accountParam, value, code, payed } = request.body
@@ -67,7 +31,7 @@ export class EntryController {
         account = await accountRepository.findOne(accountParam)
         
         if (!account) {
-          return response.status(404).json({ error: 'Account does not exists!' })
+          return response.status(404).json({ error: 'Account does not exist!' })
         }
       }
       else {
@@ -130,7 +94,102 @@ export class EntryController {
       return response.status(500).json({ error: error.message })
     }
   }
-    
+
+  async index(_: Request, response: Response) {
+    try {
+      const entryRepository = getCustomRepository(EntryRepository)
+      
+      const entries = await entryRepository.find({
+        relations: ['account'],
+      })
+      
+      return response.json(entries)
+    }
+    catch (error) {
+      return response.status(500).json({ error: error.message })
+    }
+  }
+
+  async show(request: Request, response: Response) {
+    try {
+      const { id } = request.params
+
+      if (!id) {
+        return response.status(400).json({ error: 'Entry not provided!' })
+      }
+
+      const entryRepository = getCustomRepository(EntryRepository)
+      
+      const entry = await entryRepository.findOne({
+        where: { id },
+        relations: ['account'],
+      })
+
+      if (!entry) {
+        return response.status(404).json({ error: 'Entry not found!' })
+      }
+      
+      return response.json(entry)
+    }
+    catch (error) {
+      return response.status(500).json({ error: error.message })
+    }
+  }
+
+  async update(request: Request, response: Response) {
+    try {
+      const { id } = request.params
+
+      const schema = yup.object().shape({
+        account_id: yup.string().uuid(),
+        expiration: momentDate(),
+        value: yup.number().nullable(),
+        code: yup.string().nullable(),
+        payed: yup.boolean(),
+      }).noUnknown()
+      
+      try {
+        yup.string().uuid().validateSync(id)
+
+        schema.validateSync(request.body, schemaConfig)
+      }
+      catch (error) {
+        return response.status(400).json({ error: error.message })
+      }
+
+      const repository = getCustomRepository(EntryRepository)
+
+      const entry: any = await repository.findOne({ id })
+
+      if (!entry) {
+        return response.status(404).json({ error: 'Entry not found' })
+      }
+      
+      const { account_id } = request.body
+      
+      if (account_id) {
+        const accountRepository = getCustomRepository(AccountRepository)
+        
+        const accountExists = await accountRepository.findOne({ id: account_id })
+
+        if (!accountExists) {
+          return response.status(404).json({ error: 'Account does not exist!' })
+        }
+      }
+
+      for (const field in request.body) {
+        entry[field] = request.body[field]
+      }
+
+      await repository.update({ id }, entry)
+
+      return response.json(entry)
+    }
+    catch(error) {
+      return response.status(500).json({ error: error.message })
+    }
+  }
+
   async destroy(request: Request, response: Response) {
     const { id } = request.params
 

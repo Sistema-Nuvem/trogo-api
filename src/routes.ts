@@ -38,11 +38,13 @@ router.delete('/users/:id', userController.destroy)
 router.post('/accounts', accountController.create)
 router.get('/accounts', accountController.index)
 router.get('/accounts/:id', accountController.show)
+router.put('/accounts/:id', accountController.update)
 router.delete('/accounts/:id', accountController.destroy)
 
 router.post('/entries', entryController.create)
 router.get('/entries', entryController.index)
 router.get('/entries/:id', entryController.show)
+router.put('/entries/:id', entryController.update)
 router.delete('/entries/:id', entryController.destroy)
 
 router.post('/organizations', organizationController.create)

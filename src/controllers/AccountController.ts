@@ -1,8 +1,44 @@
 import { Request, Response } from "express"
-import { getCustomRepository } from "typeorm"
+import { getCustomRepository, Like, Not } from "typeorm"
+
+import * as yup from 'yup'
+
+import { schemaConfig } from '../config/schema'
+
 import { AccountRepository } from "../repositories/AccountRepository"
 
 export class AccountController {
+
+  async create(request: Request, response: Response) {
+    try {
+      const { name, expiration_day, active } = request.body
+
+      const accountRepository = getCustomRepository(AccountRepository)
+
+      const account = await accountRepository.findOne({
+        name
+      })
+
+      if (account) {
+        return response.status(400).json({
+          error: 'Account already exists!'
+        })
+      }
+
+      const newAccount = accountRepository.create({
+        name,
+        expiration_day,
+        active: active ?? true
+      })
+
+      await accountRepository.save(newAccount)
+
+      return response.status(201).json(newAccount)
+    }
+    catch(error) {
+      return response.status(500).json({ error: error.message })
+    }
+  }
 
   async index(_: Request, response: Response) {
     try {
@@ -40,31 +76,53 @@ export class AccountController {
     }
   }
 
-  async create(request: Request, response: Response) {
+  async update(request: Request, response: Response) {
     try {
-      const { name, expiration_day, active } = request.body
+      const { id } = request.params
 
-      const accountRepository = getCustomRepository(AccountRepository)
+      const schema = yup.object().shape({
+        name: yup.string(),
+        expiration_day: yup.number().integer().min(1).max(31).nullable(),
+        active: yup.boolean(),        
+      }).noUnknown()
 
-      const account = await accountRepository.findOne({
-        name
-      })
+      try {
+        yup.string().uuid().validateSync(id)
 
-      if (account) {
-        return response.status(400).json({
-          error: 'Account already exists!'
-        })
+        schema.validateSync(request.body, schemaConfig)
+      }
+      catch (error) {
+        return response.status(400).json({ error: error.messsage })
       }
 
-      const newAccount = accountRepository.create({
-        name,
-        expiration_day,
-        active: active ?? true
-      })
+      const repository = getCustomRepository(AccountRepository)
 
-      await accountRepository.save(newAccount)
+      const account: any = await repository.findOne({ id })
 
-      return response.status(201).json(newAccount)
+      if (!account) {
+        return response.status(404).json({ error: 'Account not found' })
+      }
+      
+      const { name } = request.body
+      
+      if (name) {
+        const existsOtherSameName = await repository.findOne({
+          id: Not(id),
+          name: Like(name)
+        })
+        
+        if (existsOtherSameName) {
+          return response.status(400).json({ error: 'Another account with the same name already exists!' })
+        }
+      }
+      
+      for (const field in request.body) {
+        account[field] = request.body[field]
+      }
+
+      await repository.update({ id }, account)
+
+      return response.json(account)
     }
     catch(error) {
       return response.status(500).json({ error: error.message })
