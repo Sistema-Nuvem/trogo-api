@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { getCustomRepository, Like } from 'typeorm'
+import { getCustomRepository, Like, Not } from 'typeorm'
 import { validate } from 'uuid'
 import * as yup from 'yup'
 
@@ -174,6 +174,31 @@ export class EntryController {
 
         if (!accountExists) {
           return response.status(404).json({ error: 'Account does not exist!' })
+        }
+      }
+      
+      const { code } = request.body
+      
+      if (code) {
+        const sameCode = await repository.findOne({
+          id: Not(id), 
+          code,
+        })
+        if (sameCode) {
+          return response.status(400).json({ error: 'There is already a entry with the same digitizable line!' })
+        }
+      }
+
+      const { expiration } = request.body
+
+      if (expiration) {
+        const sameExpiration = await repository.findOne({
+          id: Not(id),
+          account_id: account_id || entry.account_id,
+          expiration,
+        })
+        if (sameExpiration) {
+          return response.status(400).json({ error: 'There is already a release of this account with the same expiration date!' })
         }
       }
 
