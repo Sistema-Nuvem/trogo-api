@@ -2,8 +2,8 @@ import { Request, Response } from "express";
 import { getCustomRepository } from "typeorm";
 import * as yup from 'yup';
 import { MemberRepository } from "../repositories/MemberRepository";
-import { getMemberWithOrganization } from "./util/member";
-import { getOrganizationFrom, getOrganizationIdFrom } from "./util/organization";
+import { getMembers, getMemberWithOrganization } from "./util/member";
+import { getOrganizationFrom, getOrganizationIdFrom, isMember } from "./util/organization";
 
 const validatorUUID = yup.string().uuid().required()
 const validatorRouterParamOrganization = yup.string().required().label('roter param organization')
@@ -72,6 +72,58 @@ export class MemberController {
     }
   }
 
+  async index(request: Request, response: Response) {
+    try {
+      const organization = await getOrganizationFrom(request.params, true)
+      if (!organization) {
+        return response.status(404).json({ error: 'Organization not found!' })
+      }
+
+      const { userId } = request as any
+
+      const is_member = await isMember(organization.id, userId)
+      if (!is_member) {
+        return response.status(401).json({ error: 'Access denied!' })
+      }
+
+      const userFiels: any = [
+        'login', 
+        'name', 
+        'avatar_url', 
+        'active'
+      ] 
+
+      const { members } = await getMembers(organization.id, userFiels)
+
+      let ownerFields = {}
+      userFiels.map((item: string) => ownerFields[item] = organization.owner[item])
+
+      Object(members.items).unshift({
+        id: null,
+        user_id: organization.owner_id,
+        role: 'owner',
+        created_at: organization.created_at,
+        user: ownerFields,
+      })
+
+      const result: any = {
+        organization: {
+          id: organization.id,
+          id_name: organization.id_name,
+          name: organization.name,
+          picture_url: organization.picture_url,
+          owner_id: organization.owner_id,
+        },
+        members: members.items,
+      }
+
+      return response.json(result)
+    }
+    catch (error) {
+      return response.status(500).json({ error: error.message })
+    }
+  }
+
   async update(request: Request, response: Response) {
     try {
       const schema = yup.object().shape({
@@ -134,7 +186,7 @@ export class MemberController {
     try {
       const { id } = request.params
 
-      const { entity: member, repository} = await getMemberWithOrganization(id)
+      const { member, repository} = await getMemberWithOrganization(id)
     
       if (!member) {
         return response.status(404).json({ error: 'Member not found!' })
