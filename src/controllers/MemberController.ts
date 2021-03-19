@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { getCustomRepository } from "typeorm";
+import * as yup from 'yup'
+
 import { MemberRepository } from "../repositories/MemberRepository";
 import { OrganizationRepository } from "../repositories/OrganizationRepository";
 
@@ -8,12 +10,32 @@ export class MemberController {
 
   async create(request: Request, response: Response) {
     try {
-      const { organization_id, user_id } = request.body
+      const schema = yup.object().shape({
+        organization_id: yup.string().uuid().required(),
+        user_id: yup.string().uuid().required(),
+        role: yup.string().nullable().oneOf([
+          'collaborator',
+          'admin',
+        ]).default('collaborator')
+      })
+
+      try {
+        schema.validateSync(request.body)
+      }
+      catch (error) {
+        return response.status(500).json({ error: error.message })
+      }
+
+      const data = schema.cast(request.body)
+
+      const { user_id } = data
       const { userId } = request as any
       
       if (userId === user_id) {
         return response.status(401).json({ error: 'You cannot add yourself to other organizations or you are already added to your own organization!' })
       }
+      
+      const { organization_id } = data
 
       const memberRepository = getCustomRepository(MemberRepository)
       
@@ -32,7 +54,8 @@ export class MemberController {
         return response.status(404).json({ error: 'Organization not found' })
       }
       
-      let role = request.body.role ?? 'participant'
+      //let role = request.body.role ?? 'participant'
+      let { role } = data
 
       const member = memberRepository.create({
         organization_id,
