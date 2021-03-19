@@ -1,12 +1,17 @@
-import { compareSync, hashSync } from "bcrypt"
 import { Request, Response } from "express"
 import { getCustomRepository } from "typeorm"
+import { compareSync, hashSync } from "bcrypt"
+import * as yup from 'yup'
+
 import { UserRepository } from "../repositories/UserRepository"
+import { passwordConfig } from "../config/password"
+import { ConditionBuilder, ConditionOptions } from "yup/lib/Condition"
+import { Context } from "node:vm"
+import { Schema } from "node:inspector"
 
 export class UserPasswordController {
   async update(request: Request, response: Response) {
     try {
-
       const { userId } = request as any
       const { id } = request.params
       
@@ -17,24 +22,42 @@ export class UserPasswordController {
       if (userId !== id) {
         return response.status(401).json({ error: 'Access denied!' })
       }
-      
-      const { password, password_new, password_confirm } = request.body
-      
-      if (!password) {
-        return response.status(400).json({ error: 'Password not provided!' })
+
+      const schema = yup.object().shape({
+        password_confirm: yup.string()
+          .label('confirm password')
+          .required('Confirm password not provided!')
+          .test({
+            message: 'New and confirm password not math!',
+            test: (value: any, context: any): any => (
+              value === context.parent.password_new
+            )
+          }),
+        password_new: yup.string()
+          .label('new password')
+          .required('New password not provided!')
+          .test({
+            message: 'The new password must be different from the current one!',
+            test: (value: any, context: any): any => (
+              value !== context.parent.password
+            )
+          })
+          .matches(
+            passwordConfig().regex, 
+            passwordConfig().instructions,
+          ),
+        password: yup.string()
+          .required('Password not provided!'),
+      })
+
+      try {
+        schema.validateSync(request.body)
       }
-      
-      if (!password_new) {
-        return response.status(400).json({ error: 'New password not provided!' })
+      catch (error) {
+        return response.status(400).json({ error: error.message })
       }
-      
-      if (password === password_new) {
-        return response.status(400).json({ error: 'The new password must be different from the current one!' })
-      }
-      
-      if (password_new !== password_confirm) {
-        return response.status(400).json({ error: 'New and confirm password not math!' })
-      }
+
+      const { password, password_new } = request.body
       
       const repository = getCustomRepository(UserRepository)
       

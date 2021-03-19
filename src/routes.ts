@@ -33,6 +33,7 @@ router.use(authMiddleware)
 router.put('/users/password/:id', userPasswordController.update)
 
 router.get('/users/:id', userController.show)
+router.put('/users/:id', userController.update)
 router.delete('/users/:id', userController.destroy)
 
 router.post('/accounts', accountController.create)
