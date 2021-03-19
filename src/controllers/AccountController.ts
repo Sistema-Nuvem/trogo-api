@@ -1,35 +1,43 @@
 import { Request, Response } from "express"
 import { getCustomRepository, Like, Not } from "typeorm"
-
 import * as yup from 'yup'
-
 import { schemaConfig } from '../config/schema'
-
 import { AccountRepository } from "../repositories/AccountRepository"
+import { myNoUnknownTest } from "../validations/myNoUnknownTest"
+
+
+
 
 export class AccountController {
 
   async create(request: Request, response: Response) {
     try {
-      const { name, expiration_day, active } = request.body
+      const schema = yup.object().shape({
+        name: yup.string().required(),
+        expiration_day: yup.number().integer().min(1).max(31).nullable(),
+        active: yup.boolean().default(true),
+      }).noUnknown().test(myNoUnknownTest)
+
+      try {
+        schema.validateSync(request.body, schemaConfig)
+      }
+      catch (error) {
+        return response.status(400).json({ error: error.message })
+      }
+
+      const data = schema.cast(request.body)
+
+      const { name } = data
 
       const accountRepository = getCustomRepository(AccountRepository)
 
-      const account = await accountRepository.findOne({
-        name
-      })
+      const account = await accountRepository.findOne({ name })
 
       if (account) {
-        return response.status(400).json({
-          error: 'Account already exists!'
-        })
+        return response.status(400).json({ error: 'Account already exists!' })
       }
 
-      const newAccount = accountRepository.create({
-        name,
-        expiration_day,
-        active: active ?? true
-      })
+      const newAccount = accountRepository.create(data)
 
       await accountRepository.save(newAccount)
 
@@ -84,16 +92,17 @@ export class AccountController {
         name: yup.string(),
         expiration_day: yup.number().integer().min(1).max(31).nullable(),
         active: yup.boolean(),        
-      }).noUnknown()
+      }).noUnknown().test(myNoUnknownTest)
 
       try {
         yup.string().uuid().validateSync(id)
-
         schema.validateSync(request.body, schemaConfig)
       }
       catch (error) {
         return response.status(400).json({ error: error.messsage })
       }
+
+      const data = schema.cast(request.body)
 
       const repository = getCustomRepository(AccountRepository)
 
@@ -103,7 +112,7 @@ export class AccountController {
         return response.status(404).json({ error: 'Account not found' })
       }
       
-      const { name } = request.body
+      const { name } = data
       
       if (name) {
         const existsOtherSameName = await repository.findOne({
@@ -116,8 +125,8 @@ export class AccountController {
         }
       }
       
-      for (const field in request.body) {
-        account[field] = request.body[field]
+      for (const field in data) {
+        account[field] = data[field]
       }
 
       await repository.update({ id }, account)

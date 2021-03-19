@@ -1,50 +1,77 @@
 import { Request, Response } from 'express'
+import moment from 'moment'
 import { getCustomRepository, Like, Not } from 'typeorm'
 import { validate } from 'uuid'
 import * as yup from 'yup'
+import { mixed } from 'yup/lib/locale'
 
 import { schemaConfig } from '../config/schema'
 
 import { AccountRepository } from '../repositories/AccountRepository'
 import { EntryRepository } from '../repositories/EntryRepository'
+import { dateFix } from '../util/moment'
+import { expirationDayOrDateTest } from '../validations/expirationDayOrDateTest'
 import { momentDate } from '../validations/momentDate'
+import { myNoUnknownTest } from '../validations/myNoUnknownTest'
 
 export class EntryController {
   async create(request: Request, response: Response) {
     try {
-      const { expiration: expirationParam, account: accountParam, value, code, payed } = request.body
-      
-      if (!accountParam) {
-        return response.status(400).json({ error: 'Account not provided!' })
+      const schema = yup.object().shape({
+        account: yup.string().required(),
+        expiration: yup.mixed().nullable().test(expirationDayOrDateTest),
+        value: yup.number().nullable(),
+        code: yup.string().nullable(),
+        payed: yup.bool().default(false)
+      }).noUnknown().test(myNoUnknownTest)
+
+      try {
+        schema.validateSync(request.body, schemaConfig)
       }
+      catch (error) {
+        return response.status(400).json({ error: error.message })
+      }
+
+      const { 
+        expiration: originalExpiration, 
+        account: originalAccount, 
+        value, 
+        code, 
+        payed 
+      } = schema.cast(request.body)
+
       
       let expiration_day: number
-      if (expirationParam) {
-        expiration_day = Number(String(expirationParam).substr(-2))
+
+      if (typeof originalExpiration === 'string') {
+        expiration_day = Number(originalExpiration.substr(-2))
       }
-      
+      else if (typeof originalExpiration === 'number') {
+        expiration_day = originalExpiration
+      }
+
       const accountRepository = getCustomRepository(AccountRepository)
       
       let account: any
       
-      if (validate(accountParam)) {
-        account = await accountRepository.findOne(accountParam)
+      if (validate(originalAccount)) {
+        account = await accountRepository.findOne(originalAccount)
         
         if (!account) {
           return response.status(404).json({ error: 'Account does not exist!' })
         }
       }
       else {
-        account = await accountRepository.findOne({ name: Like(accountParam) })
+        account = await accountRepository.findOne({ name: Like(originalAccount) })
         
         if (account) {
-          if (!expirationParam) {
+          if (!originalExpiration) {
             expiration_day = account.expiration_day
           }
         }
         else {
           account = accountRepository.create({
-            name: accountParam,
+            name: originalAccount,
             expiration_day,
           })
           await accountRepository.save(account)
@@ -53,15 +80,16 @@ export class EntryController {
       
       const entryRepository = getCustomRepository(EntryRepository)
       
-      const date = new Date()
-      
       let expiration: string = null
-      
-      if (expirationParam && String(expirationParam).indexOf('-')>-1) {
-        expiration = expirationParam
+
+      if (typeof originalExpiration === 'string' && originalExpiration.length === 10) {
+        expiration = originalExpiration
       }
-      else if (expirationParam !== null) {
-        expiration = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(expiration_day ?? date.getDate()).padStart(2,'0')}`
+      else if (originalExpiration !== null) {
+        expiration = dateFix({ day: expiration_day })
+      }
+      else if (account.expiration_day) {
+        expiration = dateFix({ day: account.expiration_day })
       }
       
       const entry = await entryRepository.findOne({
@@ -146,16 +174,17 @@ export class EntryController {
         value: yup.number().nullable(),
         code: yup.string().nullable(),
         payed: yup.boolean(),
-      }).noUnknown()
+      }).noUnknown().test(myNoUnknownTest)
       
       try {
         yup.string().uuid().validateSync(id)
-
         schema.validateSync(request.body, schemaConfig)
       }
       catch (error) {
         return response.status(400).json({ error: error.message })
       }
+
+      const data = schema.cast(request.body)
 
       const repository = getCustomRepository(EntryRepository)
 
@@ -177,7 +206,7 @@ export class EntryController {
         }
       }
       
-      const { code } = request.body
+      const { code } = data
       
       if (code) {
         const sameCode = await repository.findOne({
@@ -189,7 +218,7 @@ export class EntryController {
         }
       }
 
-      const { expiration } = request.body
+      const { expiration } = data
 
       if (expiration) {
         const sameExpiration = await repository.findOne({
@@ -202,8 +231,8 @@ export class EntryController {
         }
       }
 
-      for (const field in request.body) {
-        entry[field] = request.body[field]
+      for (const field in data) {
+        entry[field] = data[field]
       }
 
       await repository.update({ id }, entry)
