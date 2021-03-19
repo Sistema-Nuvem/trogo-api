@@ -53,8 +53,9 @@ router.get('/organizations', organizationController.index)
 router.get('/organizations/:id', organizationController.show)
 router.delete('/organizations/:id', organizationController.destroy)
 
-router.post('/members', memberController.create)
-router.delete('/members/:organization_id/:user_id', memberController.destroy)
+router.post('/:organization/members', memberController.create)
+router.put('/:organization/members/:id', memberController.update)
+router.delete('/:organization/members/:id', memberController.destroy)
 
 router.delete('/accounts', adminMiddleware, accountController.destroy)
 router.delete('/entries', adminMiddleware, entryController.destroy)
