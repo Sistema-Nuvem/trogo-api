@@ -12,7 +12,7 @@ export async function getOrganizationFrom(from: any, withOwner = false): Promise
   const repository = getCustomRepository(OrganizationRepository)
 
   let options: any = validate(param) 
-    ? param
+    ? { id: param }
     : { where: { id_name: Like(param)  }}
 
   if (withOwner) {

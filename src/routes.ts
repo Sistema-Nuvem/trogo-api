@@ -55,6 +55,7 @@ router.delete('/organizations/:id', organizationController.destroy)
 
 router.post('/:organization/members', memberController.create)
 router.get('/:organization/members', memberController.index)
+router.get('/:organization/members/:id', memberController.view)
 router.put('/:organization/members/:id', memberController.update)
 router.delete('/:organization/members/:id', memberController.destroy)
 

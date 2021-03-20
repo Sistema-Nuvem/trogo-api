@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
-import { getCustomRepository } from "typeorm";
+import { getCustomRepository, RepositoryNotTreeError } from "typeorm";
 import * as yup from 'yup';
 import { MemberRepository } from "../repositories/MemberRepository";
-import { getMembers, getMemberWithOrganization } from "./util/member";
+import { getMemberView, getMembersList, getMemberWithOrganization } from "./util/member";
 import { getOrganizationFrom, getOrganizationIdFrom, isMember } from "./util/organization";
 
 const validatorUUID = yup.string().uuid().required()
@@ -86,21 +86,21 @@ export class MemberController {
         return response.status(401).json({ error: 'Access denied!' })
       }
 
-      const userFiels: any = [
+      const userFields: any = [
+        'id', 
         'login', 
         'name', 
         'avatar_url', 
         'active'
       ] 
 
-      const { members } = await getMembers(organization.id, userFiels)
+      const { members } = await getMembersList(organization.id, userFields)
 
       let ownerFields = {}
-      userFiels.map((item: string) => ownerFields[item] = organization.owner[item])
+      userFields.map((item: string) => ownerFields[item] = organization.owner[item])
 
       Object(members.items).unshift({
-        id: null,
-        user_id: organization.owner_id,
+        id: 'onwer',
         role: 'owner',
         created_at: organization.created_at,
         user: ownerFields,
@@ -112,9 +112,83 @@ export class MemberController {
           id_name: organization.id_name,
           name: organization.name,
           picture_url: organization.picture_url,
+          active: organization.active,
           owner_id: organization.owner_id,
         },
         members: members.items,
+      }
+
+      return response.json(result)
+    }
+    catch (error) {
+      return response.status(500).json({ error: error.message })
+    }
+  }
+
+  async view(request: Request, response: Response) {
+    try {
+      const organization = await getOrganizationFrom(request.params, true)
+      if (!organization) {
+        return response.status(404).json({ error: 'Organization not found!' })
+      }
+
+      const { userId } = request as any
+
+      const { id } = request.params
+
+      let memberFound: any
+
+      if (id !== 'owner') {
+        const memberRepository = getCustomRepository(MemberRepository)
+        memberFound = await memberRepository.findOne({
+          where: { id },
+          relations: ['user']
+        })
+
+        if (!memberFound) {
+          return response.status(404).json({ error: 'Member not found!' })
+        }
+        if (memberFound.organization_id !== organization.id) {
+          return response.status(404).json({ error: 'This member is not in that organization!' })
+        }
+        
+        if (memberFound.user_id !== userId && organization.owner_id !== userId) {
+          return response.status(404).json({ error: 'Access denied!' })
+        }
+      }
+
+      const userFields: any = [
+        'id', 
+        'login', 
+        'name', 
+        'avatar_url', 
+        'active'
+      ] 
+
+      let user: any
+
+      if (memberFound && organization.owner_id !== memberFound.user_id) {
+        user = {}
+        for (const field of userFields) {
+          user[field] = memberFound.user[field]
+        }
+      }
+
+      let owner = {}
+      userFields.map((item: string) => owner[item] = organization.owner[item])
+
+      const result: any = {
+        id: id,
+        role: memberFound ? memberFound.role : 'owner',
+        user: memberFound ? user : owner,
+        organization: {
+          id: organization.id,
+          id_name: organization.id_name,
+          name: organization.name,
+          picture_url: organization.picture_url,
+          active: organization.active,
+          owner: memberFound ? owner : undefined,
+        },
       }
 
       return response.json(result)

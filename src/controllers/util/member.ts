@@ -39,7 +39,7 @@ export async function getMemberWithOrganization(options: FindOneOptions | string
   })
 }
 
-export async function getMembers(organization_id: string, withUsers: boolean | [] = false): Promise<MembersResult> {
+export async function getMembersList(organization_id: string, withUsers: boolean | [] = false): Promise<MembersResult> {
 
   const repository = getMemberRepository()
 
@@ -74,6 +74,38 @@ export async function getMembers(organization_id: string, withUsers: boolean | [
 
   return {
     members,
+    repository
+  }
+}
+
+export async function getMemberView(organization_id: string, user_id: string, withUser: boolean | [] = false): Promise<MemberResult> {
+
+  const repository = getMemberRepository()
+
+  let options: ObjectLiteral | FindOneOptions = {
+    organization_id,
+    user_id,
+  }
+
+  if (withUser) {
+    options = {
+      where: options,
+      relations: ['user'],
+    }
+  }
+
+  const member = await repository.findOne(options)
+
+  if (withUser instanceof Array) {
+    let user: any = {} 
+    for (const field of withUser) {
+      user[field] = member[field]
+    }
+    member.user = user
+  }
+
+  return {
+    member,
     repository
   }
 }
