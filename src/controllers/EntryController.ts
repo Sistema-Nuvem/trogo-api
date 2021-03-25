@@ -9,7 +9,6 @@ import { expirationDayOrDateTest } from '../validations/expirationDayOrDateTest'
 import { momentDate } from '../validations/momentDate'
 import { myNoUnknownTest } from '../validations/myNoUnknownTest'
 
-import { CONNECTION_ORGANIZATION } from '../database/connectionsNames'
 import { EntryRepository } from '../repositories/EntryRepository'
 import { AccountRepository } from '../repositories/AccountRepository'
 
@@ -49,7 +48,9 @@ export class EntryController {
         expiration_day = originalExpiration
       }
 
-      const accountRepository = getCustomRepository(AccountRepository, CONNECTION_ORGANIZATION)
+      const { organizationConnectionName } = request as any
+
+      const accountRepository = getCustomRepository(AccountRepository, organizationConnectionName)
       
       let account: any
       
@@ -77,7 +78,7 @@ export class EntryController {
         }
       }
       
-      const entryRepository = getCustomRepository(EntryRepository, CONNECTION_ORGANIZATION)
+      const entryRepository = getCustomRepository(EntryRepository, organizationConnectionName)
       
       let expiration: string = null
 
@@ -122,9 +123,10 @@ export class EntryController {
     }
   }
 
-  async index(_: Request, response: Response) {
+  async index(request: Request, response: Response) {
     try {
-      const entryRepository = getCustomRepository(EntryRepository, CONNECTION_ORGANIZATION)
+      const { organizationConnectionName } = request as any
+      const entryRepository = getCustomRepository(EntryRepository, organizationConnectionName)
       
       const entries = await entryRepository.find({
         relations: ['account'],
@@ -145,7 +147,8 @@ export class EntryController {
         return response.status(400).json({ error: 'Entry not provided!' })
       }
 
-      const entryRepository = getCustomRepository(EntryRepository, CONNECTION_ORGANIZATION)
+      const { organizationConnectionName } = request as any
+      const entryRepository = getCustomRepository(EntryRepository, organizationConnectionName)
       
       const entry = await entryRepository.findOne({
         where: { id },
@@ -185,7 +188,8 @@ export class EntryController {
 
       const data = schema.cast(request.body)
 
-      const repository = getCustomRepository(EntryRepository, CONNECTION_ORGANIZATION)
+      const { organizationConnectionName } = request as any
+      const repository = getCustomRepository(EntryRepository, organizationConnectionName)
 
       const entry: any = await repository.findOne({ id })
 
@@ -196,7 +200,7 @@ export class EntryController {
       const { account_id } = request.body
       
       if (account_id) {
-        const accountRepository = getCustomRepository(AccountRepository, CONNECTION_ORGANIZATION)
+        const accountRepository = getCustomRepository(AccountRepository, organizationConnectionName)
         
         const accountExists = await accountRepository.findOne({ id: account_id })
 
@@ -249,7 +253,8 @@ export class EntryController {
     const isDeleteAll = id === undefined
     const scope = isDeleteAll ? {} : { id }
 
-    const entryRepository = getCustomRepository(EntryRepository, CONNECTION_ORGANIZATION)
+    const { organizationConnectionName } = request as any
+    const entryRepository = getCustomRepository(EntryRepository, organizationConnectionName)
 
     if (isDeleteAll) {
       const count = await entryRepository.findAndCount()

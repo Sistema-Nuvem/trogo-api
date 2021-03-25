@@ -130,10 +130,15 @@ export class OrganizationController {
 
       const organization: any = repository.create(data)
 
-      await repository.save(organization)
-
       const connection = await createConnectionOrganization(organization.id)
+
+      if (!connection) {
+        return response.status(400).json({ error: 'Error on create new connection!' })
+      }
+
       await connection.runMigrations()
+
+      await repository.save(organization)
 
       return response.json(organization)
     }

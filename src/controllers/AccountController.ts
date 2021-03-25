@@ -2,7 +2,6 @@ import { Request, Response } from "express"
 import { getCustomRepository, Like, Not } from "typeorm"
 import * as yup from 'yup'
 import { schemaConfig } from '../config/schema'
-import { CONNECTION_ORGANIZATION } from "../database/connectionsNames"
 import { AccountRepository } from "../repositories/AccountRepository"
 import { myNoUnknownTest } from "../validations/myNoUnknownTest"
 
@@ -27,7 +26,8 @@ export class AccountController {
 
       const { name } = data
 
-      const accountRepository = getCustomRepository(AccountRepository, CONNECTION_ORGANIZATION)
+      const { organizationConnectionName } = request as any
+      const accountRepository = getCustomRepository(AccountRepository, organizationConnectionName)
 
       const account = await accountRepository.findOne({ name })
 
@@ -46,9 +46,10 @@ export class AccountController {
     }
   }
 
-  async index(_request: Request, response: Response) {
+  async index(request: Request, response: Response) {
     try {
-      const repository = getCustomRepository(AccountRepository, CONNECTION_ORGANIZATION)
+      const { organizationConnectionName } = request as any
+      const repository = getCustomRepository(AccountRepository, organizationConnectionName)
       
       const registries = await repository.find()
       
@@ -67,7 +68,8 @@ export class AccountController {
         return response.status(500).json({ error: 'Account not provided!' })
       }
 
-      const repository = getCustomRepository(AccountRepository, CONNECTION_ORGANIZATION)
+      const { organizationConnectionName } = request as any
+      const repository = getCustomRepository(AccountRepository, organizationConnectionName)
       
       const registry = await repository.findOne(id)
 
@@ -102,7 +104,8 @@ export class AccountController {
 
       const data = schema.cast(request.body)
 
-      const repository = getCustomRepository(AccountRepository, CONNECTION_ORGANIZATION)
+      const { organizationConnectionName } = request as any
+      const repository = getCustomRepository(AccountRepository, organizationConnectionName)
 
       const account: any = await repository.findOne({ id })
 
@@ -143,7 +146,8 @@ export class AccountController {
 
     const scope = isDeleteAll ? {} : { id }
 
-    const repository = getCustomRepository(AccountRepository, CONNECTION_ORGANIZATION)
+    const { organizationConnectionName } = request as any
+    const repository = getCustomRepository(AccountRepository, organizationConnectionName)
 
     if (isDeleteAll) {
       const count = await repository.findAndCount()

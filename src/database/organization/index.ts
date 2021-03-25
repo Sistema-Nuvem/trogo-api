@@ -1,35 +1,32 @@
-import { Connection, createConnection, getConnection, getConnectionManager, getConnectionOptions } from "typeorm"
-
+import { Connection, ConnectionOptions, createConnection, getConnection, getConnectionManager, getConnectionOptions } from "typeorm"
 import { CONNECTION_ORGANIZATION } from "../connectionsNames"
 
+export function getOrganizationConnectionName(organization_id: string): string {
+  return `${CONNECTION_ORGANIZATION}_${organization_id}`
+}
+
 export async function createConnectionOrganization(organization_id: string): Promise<Connection> {
-  try {
-    const manager = getConnectionManager()
-    
-    let connection: Connection
+  const connectionName = getOrganizationConnectionName(organization_id)
+  
+  const manager = getConnectionManager()
 
-    if (manager.has(CONNECTION_ORGANIZATION)) {
-      connection = getConnection(CONNECTION_ORGANIZATION)
-    }
-    else {
-      const options = await getConnectionOptions()
-      
-      Object.assign(options, {
-        name: CONNECTION_ORGANIZATION,
-        database: `./src/database/organization/databases.sqlite/database.${organization_id}.sqlite`,
-        migrations: ["./src/database/organization/migrations/**.ts"],
-        entities: [
-          "./src/models/organization/**.ts",
-          "./src/models/**.ts",
-        ],
-      })
-      
-      connection = await createConnection(options)
-    }
-
-    return connection
+  if (manager.has(connectionName)) {
+    return getConnection(connectionName)
   }
-  catch (error) {
-    return null
+  else {
+    const defaultOptions = await getConnectionOptions()
+
+    const options = {
+      ...defaultOptions,
+      name: connectionName,
+      database: `./src/database/organization/databases.sqlite/database.${organization_id}.sqlite`,
+      migrations: ["./src/database/organization/migrations/**.ts"],
+      entities: [
+        "./src/models/organization/**.ts",
+        "./src/models/**.ts",
+      ]
+    } as ConnectionOptions
+
+    return await createConnection(options)
   }
 }
