@@ -1,3 +1,7 @@
+# Ainda funciona de forma específica, necessitando informar o uuid da organização nele:
+ormconfig.organization.json
+
+src/database/organization/databases.sqlite/
 src/database/database.sqlite
 
 # Logs

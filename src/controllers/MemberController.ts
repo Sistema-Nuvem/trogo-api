@@ -1,12 +1,12 @@
 import { Request, Response } from "express";
-import { getCustomRepository, RepositoryNotTreeError } from "typeorm";
+import { getCustomRepository } from "typeorm";
 import * as yup from 'yup';
 import { MemberRepository } from "../repositories/MemberRepository";
-import { getMemberView, getMembersList, getMemberWithOrganization } from "./util/member";
-import { getOrganizationFrom, getOrganizationIdFrom, isMember } from "./util/organization";
+import { UserRepository } from "../repositories/UserRepository";
+import { getMembersList, getMemberWithOrganization } from "./util/member";
+import { getOrganizationFrom } from "./util/organization";
 
 const validatorUUID = yup.string().uuid().required()
-const validatorRouterParamOrganization = yup.string().required().label('roter param organization')
 const validatorRouterParamMember = validatorUUID.label('router param member id')
 
 export class MemberController {
@@ -22,7 +22,6 @@ export class MemberController {
       })
 
       try {
-        validatorRouterParamOrganization.validateSync(request.params.organization)
         schema.validateSync(request.body)
       }
       catch (error) {
@@ -37,11 +36,15 @@ export class MemberController {
       if (userId === user_id) {
         return response.status(401).json({ error: 'You cannot add yourself to other organizations or you are already added to your own organization!' })
       }
-
-      const organization_id = await getOrganizationIdFrom(request.params)
-      if (!organization_id) {
-        return response.status(404).json({ error: 'Organization not found!' })
+      
+      const userRepository = getCustomRepository(UserRepository)
+      const userFound = await userRepository.findOne(user_id)
+      if (!userFound) {
+        return response.status(404).json({ error: 'User not found!' })
       }
+      userFound.password_hash = undefined
+
+      const { organizationId: organization_id } = request as any
 
       const memberRepository = getCustomRepository(MemberRepository)
       
@@ -54,7 +57,6 @@ export class MemberController {
         return response.status(401).json({ error: 'The user is already a member of the organization' })
       }
       
-      //let role = request.body.role ?? 'participant'
       let { role } = data
 
       const member = memberRepository.create({
@@ -62,8 +64,9 @@ export class MemberController {
         user_id,
         role,
       })
-      
+
       await memberRepository.save(member)
+      console.log('member: ', member)
       
       return response.json(member)
     }
@@ -74,17 +77,7 @@ export class MemberController {
 
   async index(request: Request, response: Response) {
     try {
-      const organization = await getOrganizationFrom(request.params, true)
-      if (!organization) {
-        return response.status(404).json({ error: 'Organization not found!' })
-      }
-
-      const { userId } = request as any
-
-      const is_member = await isMember(organization.id, userId)
-      if (!is_member) {
-        return response.status(401).json({ error: 'Access denied!' })
-      }
+      const { organization } = request as any
 
       const userFields: any = [
         'id', 
@@ -127,12 +120,7 @@ export class MemberController {
 
   async view(request: Request, response: Response) {
     try {
-      const organization = await getOrganizationFrom(request.params, true)
-      if (!organization) {
-        return response.status(404).json({ error: 'Organization not found!' })
-      }
-
-      const { userId } = request as any
+      const { userId, organizationId, ownerId, organization } = request as any
 
       const { id } = request.params
 
@@ -148,12 +136,9 @@ export class MemberController {
         if (!memberFound) {
           return response.status(404).json({ error: 'Member not found!' })
         }
-        if (memberFound.organization_id !== organization.id) {
+
+        if (memberFound.organization_id !== organizationId) {
           return response.status(404).json({ error: 'This member is not in that organization!' })
-        }
-        
-        if (memberFound.user_id !== userId && organization.owner_id !== userId) {
-          return response.status(404).json({ error: 'Access denied!' })
         }
       }
 
@@ -167,15 +152,18 @@ export class MemberController {
 
       let user: any
 
-      if (memberFound && organization.owner_id !== memberFound.user_id) {
+      if (memberFound && ownerId !== memberFound.user_id) {
         user = {}
         for (const field of userFields) {
           user[field] = memberFound.user[field]
         }
       }
-
+      console.log('organization: ', organization)
+      console.log('userFields: ', userFields)
       let owner = {}
       userFields.map((item: string) => owner[item] = organization.owner[item])
+
+      console.log('owner: ', owner)
 
       const result: any = {
         id: id,
@@ -207,10 +195,9 @@ export class MemberController {
         ])
       })
 
-      const { organization: organization_param, id } = request.params
+      const { id } = request.params
 
       try {
-        validatorRouterParamOrganization.validateSync(organization_param)
         validatorRouterParamMember.validateSync(id)
         schema.validateSync(request.body)
       }
@@ -218,17 +205,12 @@ export class MemberController {
         return response.status(400).json({ error: error.message })
       }
 
-      const organization_id = await getOrganizationIdFrom(request.params)
-      console.log('organization_id: ', organization_id)
-      if (!organization_id) {
-        return response.status(404).json({ error: 'Organization not found!' })
-      }
+      const { organizationId: organization_id } = request as any
 
       const repository = getCustomRepository(MemberRepository)
             
       const member = await repository.findOne({
         where: { id, organization_id },
-        relations: ['organization', 'user'],
       })
       
       console.log('member: ', member)
@@ -237,13 +219,7 @@ export class MemberController {
         return response.status(404).json({ error: 'Member not found in that organization!' })
       }
       
-      const { userId } = request as any
-      if (member.organization.owner_id !== userId) {
-        return response.status(401).json({ error: 'You cannot modify a member of an organization in which you are not the owner!' })
-      }
-      
       member.role = request.body.role
-      member.user.password_hash = undefined
 
       await repository.update(id, {
         role: member.role

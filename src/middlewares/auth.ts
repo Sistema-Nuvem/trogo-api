@@ -1,8 +1,9 @@
 import { NextFunction, Request, Response } from "express";
-import pify from 'pify';
 import jwt from 'jsonwebtoken';
-import { authConfig } from "../config/auth";
+import pify from 'pify';
 import { getCustomRepository } from "typeorm";
+
+import { authConfig } from "../config/auth";
 import { UserRepository } from "../repositories/UserRepository";
 
 export default async (request: Request, response: Response, next: NextFunction) => {
@@ -30,9 +31,9 @@ export default async (request: Request, response: Response, next: NextFunction) 
 
     request['userId'] = decoded.id
 
-    const repository = getCustomRepository(UserRepository)
-
-    const userSession = await repository.findOne(request['userId']);
+    const userRepository = getCustomRepository(UserRepository)
+    
+    const userSession = await userRepository.findOne(request['userId']);
 
     if (!userSession) {
       return response.status(400).json({ error: 'Invalid session' });

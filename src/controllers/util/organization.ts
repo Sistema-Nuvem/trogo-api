@@ -1,10 +1,9 @@
-import { NextFunction } from "express"
-import { exception } from "node:console"
 import { getCustomRepository, Like } from "typeorm"
 import { validate } from "uuid"
+
 import { Organization } from "../../models/Organization"
-import { MemberRepository } from "../../repositories/MemberRepository"
 import { OrganizationRepository } from "../../repositories/OrganizationRepository"
+import { MemberRepository } from "../../repositories/MemberRepository"
 
 export async function getOrganizationFrom(from: any, withOwner = false): Promise<Organization> {
   const param = (typeof from === 'string') || from.organization

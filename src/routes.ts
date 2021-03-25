@@ -1,29 +1,39 @@
 import { Request, Response, Router } from "express"
-import { AccountController } from './controllers/AccountController'
-import { AdminUsersController } from "./controllers/AdminUsersController"
-import { EntryController } from './controllers/EntryController'
-import { MemberController } from "./controllers/MemberController"
-import { SessionController } from "./controllers/SessionController"
+
 import { UserControler } from "./controllers/UserController"
-import { OrganizationController } from "./controllers/OrganizationController"
+import { SessionController } from "./controllers/SessionController"
 import { UserPasswordController } from "./controllers/UserPasswordController"
-import adminMiddleware from './middlewares/admin'
+import { OrganizationController } from "./controllers/OrganizationController"
+import { MemberController } from "./controllers/MemberController"
+import { AccountController } from './controllers/AccountController'
+import { EntryController } from './controllers/EntryController'
+//import { AdminUsersController } from "./controllers/AdminUsersController"
+
+import connectionsMiddleware from './middlewares/connections'
 import authMiddleware from './middlewares/auth'
+import organizationMiddleware from './middlewares/organization'
+import ownerMiddleware from './middlewares/owner'
+import memberMiddleware from './middlewares/member'
+import connectionOrganizationMiddleware from './middlewares/connectionOrganization'
+//import adminMiddleware from './middlewares/admin'
 
 export const router = Router()
 
-const sessionController = new SessionController()
 const userController = new UserControler()
-const adminUsersController = new AdminUsersController()
+const sessionController = new SessionController()
 const userPasswordController = new UserPasswordController()
-const accountController = new AccountController()
-const entryController = new EntryController()
 const organizationController = new OrganizationController()
 const memberController = new MemberController()
+const entryController = new EntryController()
+const accountController = new AccountController()
+//const adminUsersController = new AdminUsersController()
+
 
 router.get('/', (_: Request, response: Response) => {
   response.send('<h1>Trogo API</h1>')
 })
+
+router.use(connectionsMiddleware)
 
 router.post('/users', userController.create)
 router.post('/sessions', sessionController.create)
@@ -36,32 +46,33 @@ router.get('/users/:id', userController.show)
 router.put('/users/:id', userController.update)
 router.delete('/users/:id', userController.destroy)
 
-router.post('/accounts', accountController.create)
-router.get('/accounts', accountController.index)
-router.get('/accounts/:id', accountController.show)
-router.put('/accounts/:id', accountController.update)
-router.delete('/accounts/:id', accountController.destroy)
-
-router.post('/entries', entryController.create)
-router.get('/entries', entryController.index)
-router.get('/entries/:id', entryController.show)
-router.put('/entries/:id', entryController.update)
-router.delete('/entries/:id', entryController.destroy)
-
 router.post('/organizations', organizationController.create)
 router.get('/organizations', organizationController.index)
 router.get('/organizations/:id', organizationController.show)
+router.put('/organizations/:id', organizationController.update)
 router.delete('/organizations/:id', organizationController.destroy)
 
-router.post('/:organization/members', memberController.create)
-router.get('/:organization/members', memberController.index)
-router.get('/:organization/members/:id', memberController.view)
-router.put('/:organization/members/:id', memberController.update)
-router.delete('/:organization/members/:id', memberController.destroy)
+router.post('/:organization/members', organizationMiddleware, ownerMiddleware, memberController.create)
+router.get('/:organization/members', organizationMiddleware, memberMiddleware, memberController.index)
+router.get('/:organization/members/:id', organizationMiddleware, memberMiddleware, memberController.view)
+router.put('/:organization/members/:id', organizationMiddleware, ownerMiddleware, memberController.update)
+router.delete('/:organization/members/:id', organizationMiddleware, memberMiddleware, memberController.destroy)
 
-router.delete('/accounts', adminMiddleware, accountController.destroy)
-router.delete('/entries', adminMiddleware, entryController.destroy)
+router.post('/:organization/accounts', organizationMiddleware, connectionOrganizationMiddleware, accountController.create)
+router.get('/:organization/accounts', organizationMiddleware, connectionOrganizationMiddleware, accountController.index)
+router.get('/:organization/accounts/:id', organizationMiddleware, connectionOrganizationMiddleware, accountController.show)
+router.put('/:organization/accounts/:id', organizationMiddleware, connectionOrganizationMiddleware, accountController.update)
+router.delete('/:organization/accounts/:id', organizationMiddleware, connectionOrganizationMiddleware, accountController.destroy)
 
-router.get('/admin/users', adminMiddleware, adminUsersController.index)
-router.delete('/admin/users/:id', adminMiddleware, adminUsersController.destroy)
-router.delete('/admin/users', adminMiddleware, adminUsersController.destroy)
+router.post('/:organization/entries', organizationMiddleware, connectionOrganizationMiddleware, entryController.create)
+router.get('/:organization/entries', organizationMiddleware, connectionOrganizationMiddleware, entryController.index)
+router.get('/:organization/entries/:id', organizationMiddleware, connectionOrganizationMiddleware, entryController.show)
+router.put('/:organization/entries/:id', organizationMiddleware, connectionOrganizationMiddleware, entryController.update)
+router.delete('/:organization/entries/:id', organizationMiddleware, connectionOrganizationMiddleware, entryController.destroy)
+
+//router.delete('/accounts', adminMiddleware, accountController.destroy)
+//router.delete('/entries', adminMiddleware, entryController.destroy)
+
+//router.get('/admin/users', adminMiddleware, adminUsersController.index)
+//router.delete('/admin/users/:id', adminMiddleware, adminUsersController.destroy)
+//router.delete('/admin/users', adminMiddleware, adminUsersController.destroy)

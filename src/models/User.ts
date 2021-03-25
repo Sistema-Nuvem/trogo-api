@@ -1,5 +1,5 @@
 import { Column, CreateDateColumn, Entity, PrimaryColumn } from "typeorm";
-import { v4 as uuid } from 'uuid'
+import { v4 as uuid } from 'uuid';
 
 @Entity('users')
 export class User {
@@ -27,6 +27,9 @@ export class User {
 
   @Column()
   password_hash: string
+
+  /*@OneToMany(() => Member, member => member.user)
+  members: Member[]*/
 
   @CreateDateColumn()
   created_at: Date

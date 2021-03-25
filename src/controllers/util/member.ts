@@ -1,13 +1,12 @@
 import { FindManyOptions, FindOneOptions, getCustomRepository, ObjectLiteral } from "typeorm";
+
 import { Member } from "../../models/Member";
 import { MemberRepository } from "../../repositories/MemberRepository";
-import { getOrganizationIdFrom } from "./organization";
 
 interface MemberResult {
   member: Member
   repository: MemberRepository
 }
-
 
 interface MembersResult {
   members: {
@@ -17,13 +16,9 @@ interface MembersResult {
   repository: MemberRepository
 }
 
-export function getMemberRepository() {
-  return getCustomRepository(MemberRepository)
-}
-
 export async function getMember(options: FindOneOptions): Promise<MemberResult> {
 
-  const repository = getMemberRepository()
+  const repository = getCustomRepository(MemberRepository)
 
   return {
     member: await repository.findOne(options),
@@ -41,11 +36,11 @@ export async function getMemberWithOrganization(options: FindOneOptions | string
 
 export async function getMembersList(organization_id: string, withUsers: boolean | [] = false): Promise<MembersResult> {
 
-  const repository = getMemberRepository()
+  const repository: MemberRepository = getCustomRepository(MemberRepository)
 
   let options: ObjectLiteral | FindManyOptions = {
     organization_id,
-  }
+  } 
 
   if (withUsers) {
     options = {
@@ -55,18 +50,19 @@ export async function getMembersList(organization_id: string, withUsers: boolean
   }
 
   const items = await repository.find(options)
-
-  items.map((item: any) => {
-    item.organization_id = undefined
-    if (withUsers instanceof Array) {
-      let user: any = {} 
-      for (const field of withUsers) {
-        user[field] = item.user[field]
+  if (items) {
+    items.map(async (item: any) => {
+      item.organization_id = undefined
+      if (withUsers instanceof Array) {
+        let user: any = {} 
+        for (const field of withUsers) {
+          user[field] = item.user[field]
+        }
+        item.user = user
       }
-      item.user = user
-    }
-  })
-
+    })
+  }
+    
   const members = {
     organization_id,
     items,
@@ -74,38 +70,6 @@ export async function getMembersList(organization_id: string, withUsers: boolean
 
   return {
     members,
-    repository
-  }
-}
-
-export async function getMemberView(organization_id: string, user_id: string, withUser: boolean | [] = false): Promise<MemberResult> {
-
-  const repository = getMemberRepository()
-
-  let options: ObjectLiteral | FindOneOptions = {
-    organization_id,
-    user_id,
-  }
-
-  if (withUser) {
-    options = {
-      where: options,
-      relations: ['user'],
-    }
-  }
-
-  const member = await repository.findOne(options)
-
-  if (withUser instanceof Array) {
-    let user: any = {} 
-    for (const field of withUser) {
-      user[field] = member[field]
-    }
-    member.user = user
-  }
-
-  return {
-    member,
     repository
   }
 }
