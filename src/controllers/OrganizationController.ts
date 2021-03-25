@@ -205,6 +205,11 @@ export class OrganizationController {
       const memberRepository = getCustomRepository(MemberRepository)
 
       for (const item of organizations) {
+        item.owner = {
+          name: item.owner.name,
+          avatar_url: item.owner.avatar_url
+        }
+
         const members = await memberRepository.find({
           where: { organization_id: item.id },
           relations: ['user'],
@@ -221,7 +226,7 @@ export class OrganizationController {
         }))
       }
 
-      return response.json({ organizations })
+      return response.json(organizations)
     }
     catch (error) {
       return response.status(500).json({ error: error.message })
