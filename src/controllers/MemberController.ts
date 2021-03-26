@@ -66,7 +66,6 @@ export class MemberController {
       })
 
       await memberRepository.save(member)
-      console.log('member: ', member)
       
       return response.json(member)
     }
@@ -158,12 +157,8 @@ export class MemberController {
           user[field] = memberFound.user[field]
         }
       }
-      console.log('organization: ', organization)
-      console.log('userFields: ', userFields)
       let owner = {}
       userFields.map((item: string) => owner[item] = organization.owner[item])
-
-      console.log('owner: ', owner)
 
       const result: any = {
         id: id,
@@ -213,8 +208,6 @@ export class MemberController {
         where: { id, organization_id },
       })
       
-      console.log('member: ', member)
-
       if (!member) {
         return response.status(404).json({ error: 'Member not found in that organization!' })
       }
