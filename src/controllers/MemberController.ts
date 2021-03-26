@@ -1,10 +1,11 @@
 import { Request, Response } from "express";
 import { getCustomRepository } from "typeorm";
 import * as yup from 'yup';
+import { schemaConfig } from "../config/schema";
 import { MemberRepository } from "../repositories/MemberRepository";
+import { OrganizationRepository } from "../repositories/OrganizationRepository";
 import { UserRepository } from "../repositories/UserRepository";
-import { getMembersList, getMemberWithOrganization } from "./util/member";
-import { getOrganizationFrom } from "./util/organization";
+import { myNoUnknownTest } from "../validations/myNoUnknownTest";
 
 const validatorUUID = yup.string().uuid().required()
 const validatorRouterParamMember = validatorUUID.label('router param member id')
@@ -19,10 +20,10 @@ export class MemberController {
           'collaborator',
           'admin',
         ]).default('collaborator')
-      })
+      }).noUnknown().test(myNoUnknownTest)
 
       try {
-        schema.validateSync(request.body)
+        schema.validateSync(request.body, schemaConfig)
       }
       catch (error) {
         return response.status(500).json({ error: error.message })
@@ -86,7 +87,9 @@ export class MemberController {
         'active'
       ] 
 
-      const { members } = await getMembersList(organization.id, userFields)
+      const repository = getCustomRepository(MemberRepository)
+      
+      const members = await repository.getList(organization.id, userFields)
 
       let ownerFields = {}
       userFields.map((item: string) => ownerFields[item] = organization.owner[item])
@@ -119,7 +122,7 @@ export class MemberController {
 
   async view(request: Request, response: Response) {
     try {
-      const { userId, organizationId, ownerId, organization } = request as any
+      const { organizationId, ownerId, organization } = request as any
 
       const { id } = request.params
 
@@ -187,14 +190,14 @@ export class MemberController {
         role: yup.string().oneOf([
           'collaborator',
           'admin',
-        ])
-      })
+        ]).required()
+      }).noUnknown().test(myNoUnknownTest)
 
       const { id } = request.params
 
       try {
         validatorRouterParamMember.validateSync(id)
-        schema.validateSync(request.body)
+        schema.validateSync(request.body, schemaConfig)
       }
       catch (error) {
         return response.status(400).json({ error: error.message })
@@ -229,7 +232,12 @@ export class MemberController {
     try {
       const { id } = request.params
 
-      const { member, repository} = await getMemberWithOrganization(id)
+      const repository = getCustomRepository(MemberRepository)
+      
+      const member = await repository.findOne({
+        where: { id },
+        relations: ['organization']
+      })
     
       if (!member) {
         return response.status(404).json({ error: 'Member not found!' })
@@ -240,7 +248,7 @@ export class MemberController {
         return response.status(404).json({ error: 'Access denied!' })
       }
 
-      const organization = await getOrganizationFrom(request.params)
+      const organization = await getCustomRepository(OrganizationRepository).getFrom(request.params)
       if (!organization) {
         return response.status(400).json({ error: 'Organization not found!' })
       }
@@ -252,7 +260,6 @@ export class MemberController {
       await repository.delete(id)
 
       return response.json({ message: 'Member successfully deleted!' })
-      
     }
     catch (error) {
       return response.status(500).json({ error: error.message })

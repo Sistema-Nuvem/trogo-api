@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express"
+import { getCustomRepository } from "typeorm"
 import * as yup from 'yup'
-
-import { getOrganizationFrom } from "../controllers/util/organization"
+import { OrganizationRepository } from "../repositories/OrganizationRepository"
 
 const validatorRouterParamOrganization = yup.string().required().label('roter param organization')
 
@@ -14,7 +14,7 @@ export default async (request: Request, response: Response, next: NextFunction) 
       return response.status(400).json({ error: error.message })
     }
 
-    const organization = await getOrganizationFrom(request.params, true)
+    const organization = await getCustomRepository(OrganizationRepository).getFrom(request.params, true)
     if (!organization) {
       return response.status(404).json({ error: 'Organization not found!' })
     }
