@@ -101,6 +101,13 @@ export class MemberController {
         user: ownerFields,
       })
 
+      const membersItems = members.items.map(item => ({
+        id: item.id,
+        role: item.role,
+        created_at: item.created_at,
+        user: item.user,
+      }))
+
       const result: any = {
         organization: {
           id: organization.id,
@@ -110,7 +117,7 @@ export class MemberController {
           active: organization.active,
           owner_id: organization.owner_id,
         },
-        members: members.items,
+        members: membersItems,
       }
 
       return response.json(result)
