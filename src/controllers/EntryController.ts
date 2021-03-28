@@ -2,29 +2,57 @@ import { Request, Response } from 'express'
 import { getCustomRepository, Like, Not } from 'typeorm'
 import { validate } from 'uuid'
 import * as yup from 'yup'
-
 import { schemaConfig } from '../config/schema'
+import { AccountRepository } from '../repositories/AccountRepository'
+import { DocumentRepository } from '../repositories/DocumentRepository'
+import { EntryRepository } from '../repositories/EntryRepository'
 import { dateFix } from '../util/moment'
 import { expirationDayOrDateTest } from '../validations/expirationDayOrDateTest'
 import { momentDate } from '../validations/momentDate'
 import { myNoUnknownTest } from '../validations/myNoUnknownTest'
-
-import { EntryRepository } from '../repositories/EntryRepository'
-import { AccountRepository } from '../repositories/AccountRepository'
 
 export class EntryController {
   async create(request: Request, response: Response) {
     try {
       const schema = yup.object().shape({
         account: yup.string().required(),
-        expiration: yup.mixed().nullable().test(expirationDayOrDateTest),
+        expiration: yup.mixed().nullable()
+          .optional()
+          .test(expirationDayOrDateTest),
         value: yup.number().nullable(),
         code: yup.string().nullable(),
-        payed: yup.bool().default(false)
+        payed: yup.bool().default(false),
+        document_id: yup.string().uuid()
+        .nullable()
+        .optional()
+        .test({
+          message: 'Document not found',
+          test: async (value, context) => {
+            if (!value) return true
+            const { organizationConnectionName } = context.schema
+            const repository = getCustomRepository(DocumentRepository, organizationConnectionName)
+            const document = await repository.findOne(value) 
+            return Boolean(document)
+          }
+        })
+        .test({
+          message: 'document is already used in another entry',
+          test: async (value, context) => {
+            if (!value) return true
+            const { organizationConnectionName } = context.schema
+            const repository = getCustomRepository(EntryRepository, organizationConnectionName)
+            const document = await repository.findOne({document_id: value}) 
+            return !Boolean(document)
+          }
+        }),
       }).noUnknown().test(myNoUnknownTest)
+      
+      const { organizationConnectionName } = request as any
+
+      schema.fields.document_id['organizationConnectionName'] = organizationConnectionName
 
       try {
-        schema.validateSync(request.body, schemaConfig)
+        await schema.validate(request.body, schemaConfig)
       }
       catch (error) {
         return response.status(400).json({ error: error.message })
@@ -35,7 +63,8 @@ export class EntryController {
         account: originalAccount, 
         value, 
         code, 
-        payed 
+        payed,
+        document_id,
       } = schema.cast(request.body)
 
       
@@ -48,7 +77,6 @@ export class EntryController {
         expiration_day = originalExpiration
       }
 
-      const { organizationConnectionName } = request as any
 
       const accountRepository = getCustomRepository(AccountRepository, organizationConnectionName)
       
@@ -112,6 +140,7 @@ export class EntryController {
         value,
         code,
         payed,
+        document_id,
       })
       
       await entryRepository.save(newEntry)
@@ -165,30 +194,12 @@ export class EntryController {
       return response.status(500).json({ error: error.message })
     }
   }
-
+  
   async update(request: Request, response: Response) {
     try {
       const { id } = request.params
-
-      const schema = yup.object().shape({
-        account_id: yup.string().uuid(),
-        expiration: momentDate(),
-        value: yup.number().nullable(),
-        code: yup.string().nullable(),
-        payed: yup.boolean(),
-      }).noUnknown().test(myNoUnknownTest)
-      
-      try {
-        yup.string().uuid().validateSync(id)
-        schema.validateSync(request.body, schemaConfig)
-      }
-      catch (error) {
-        return response.status(400).json({ error: error.message })
-      }
-
-      const data = schema.cast(request.body)
-
       const { organizationConnectionName } = request as any
+
       const repository = getCustomRepository(EntryRepository, organizationConnectionName)
 
       const entry: any = await repository.findOne({ id })
@@ -197,6 +208,51 @@ export class EntryController {
         return response.status(404).json({ error: 'Entry not found' })
       }
       
+      const schema = yup.object().shape({
+        account_id: yup.string().uuid().optional(),
+        expiration: momentDate(),
+        value: yup.number().nullable(),
+        code: yup.string().nullable().optional(),
+        payed: yup.boolean().optional(),
+        document_id: yup.string().uuid()
+          .nullable()
+          .optional()
+          .test({
+          message: 'Document not found',
+          test: async (value, context) => {
+            if (!value) return true
+            const { organizationConnectionName } = context.schema
+            const repository = getCustomRepository(DocumentRepository, organizationConnectionName)
+            const document = await repository.findOne(value) 
+            return Boolean(document)
+          }
+        })
+        .test({
+          message: 'document is already used in another entry',
+          test: async (value, context) => {
+            if (!value) return true
+            const { organizationConnectionName, id } = context.schema
+            const repository = getCustomRepository(EntryRepository, organizationConnectionName)
+            const document = await repository.findOne({id: Not(id), document_id: value}) 
+            return !Boolean(document)
+          }
+        }),
+      }).noUnknown().test(myNoUnknownTest)
+      
+      
+      schema.fields.document_id['organizationConnectionName'] = organizationConnectionName
+      schema.fields.document_id['id'] = id
+
+      try {
+        yup.string().uuid().validateSync(id)
+        await schema.validate(request.body, schemaConfig)
+      }
+      catch (error) {
+        return response.status(400).json({ error: error.message })
+      }
+
+      const data = schema.cast(request.body)
+
       const { account_id } = request.body
       
       if (account_id) {

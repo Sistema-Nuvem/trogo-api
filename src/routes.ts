@@ -1,4 +1,7 @@
 import { Request, Response, Router } from "express"
+import multer from 'multer'
+
+import multerConfig from './config/multer'
 
 import { UserControler } from "./controllers/UserController"
 import { SessionController } from "./controllers/SessionController"
@@ -15,9 +18,11 @@ import organizationMiddleware from './middlewares/organization'
 import ownerMiddleware from './middlewares/owner'
 import memberMiddleware from './middlewares/member'
 import connectionOrganizationMiddleware from './middlewares/connectionOrganization'
+import DocumentController from "./controllers/DocumentController"
 //import adminMiddleware from './middlewares/admin'
 
 export const router = Router()
+const upload = multer(multerConfig)
 
 const userController = new UserControler()
 const sessionController = new SessionController()
@@ -64,7 +69,14 @@ router.get('/:organization/accounts/:id', organizationMiddleware, connectionOrga
 router.put('/:organization/accounts/:id', organizationMiddleware, connectionOrganizationMiddleware, accountController.update)
 router.delete('/:organization/accounts/:id', organizationMiddleware, connectionOrganizationMiddleware, accountController.destroy)
 
-router.post('/:organization/entries', organizationMiddleware, connectionOrganizationMiddleware, entryController.create)
+router.post('/:organization/entries', 
+  organizationMiddleware, connectionOrganizationMiddleware, 
+  entryController.create
+)
+router.post('/:organization/entries/documents', 
+  organizationMiddleware, connectionOrganizationMiddleware, 
+  upload.single('file'), DocumentController.store
+)
 router.get('/:organization/entries', organizationMiddleware, connectionOrganizationMiddleware, entryController.index)
 router.get('/:organization/entries/:id', organizationMiddleware, connectionOrganizationMiddleware, entryController.show)
 router.put('/:organization/entries/:id', organizationMiddleware, connectionOrganizationMiddleware, entryController.update)

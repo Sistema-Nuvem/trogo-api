@@ -1,3 +1,6 @@
+tmp/
+tmp/uploads/
+
 # Ainda funciona de forma específica, necessitando informar o uuid da organização nele:
 ormconfig.organization.json
 

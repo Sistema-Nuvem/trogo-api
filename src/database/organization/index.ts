@@ -11,7 +11,10 @@ export async function createConnectionOrganization(organization_id: string): Pro
   const manager = getConnectionManager()
 
   if (manager.has(connectionName)) {
-    return getConnection(connectionName)
+    const connection = getConnection(connectionName)
+
+    console.log(`pegando conexão ${connection.name} ...`)
+    return connection
   }
   else {
     const defaultOptions = await getConnectionOptions()
@@ -24,9 +27,11 @@ export async function createConnectionOrganization(organization_id: string): Pro
       entities: [
         "./src/models/organization/**.ts",
         "./src/models/**.ts",
-      ]
+      ],
+      migrationsRun: true,
     } as ConnectionOptions
 
+    console.log(`criando conexão ${connectionName} ...`)
     return await createConnection(options)
   }
 }

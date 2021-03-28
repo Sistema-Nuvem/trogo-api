@@ -1,7 +1,8 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryColumn } from "typeorm";
 import { v4 as uuid } from 'uuid'
 
 import { Account } from './Account'
+import { Document } from "./Document";
 
 @Entity('entries')
 export class Entry {
@@ -27,6 +28,13 @@ export class Entry {
 
   @Column()
   code: string
+
+  @Column()
+  document_id: string
+
+  @OneToOne(() => Document)
+  @JoinColumn({ name: 'document_id' })
+  document: Document
 
   @CreateDateColumn()
   created_at: Date
