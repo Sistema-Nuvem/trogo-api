@@ -30,11 +30,18 @@ export class Entry {
   code: string
 
   @Column()
-  document_id: string
+  invoice_id: string
 
   @OneToOne(() => Document)
-  @JoinColumn({ name: 'document_id' })
-  document: Document
+  @JoinColumn({ name: 'invoice_id' })
+  invoice: Document
+
+  @Column()
+  proof_id: string
+
+  @OneToOne(() => Document)
+  @JoinColumn({ name: 'proof_id' })
+  proof: Document
 
   @CreateDateColumn()
   created_at: Date

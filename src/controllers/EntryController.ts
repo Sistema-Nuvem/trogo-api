@@ -22,11 +22,11 @@ export class EntryController {
         value: yup.number().nullable(),
         code: yup.string().nullable(),
         payed: yup.bool().default(false),
-        document_id: yup.string().uuid()
+        invoice_id: yup.string().uuid()
         .nullable()
         .optional()
         .test({
-          message: 'Document not found',
+          message: 'Invoice not found',
           test: async (value, context) => {
             if (!value) return true
             const { organizationConnectionName } = context.schema
@@ -36,12 +36,35 @@ export class EntryController {
           }
         })
         .test({
-          message: 'document is already used in another entry',
+          message: 'Invoice is already used in another entry',
           test: async (value, context) => {
             if (!value) return true
             const { organizationConnectionName } = context.schema
             const repository = getCustomRepository(EntryRepository, organizationConnectionName)
-            const document = await repository.findOne({document_id: value}) 
+            const document = await repository.findOne({ invoice_id: value }) 
+            return !Boolean(document)
+          }
+        }),
+        proof_id: yup.string().uuid()
+        .nullable()
+        .optional()
+        .test({
+          message: 'Proof not found',
+          test: async (value, context) => {
+            if (!value) return true
+            const { organizationConnectionName } = context.schema
+            const repository = getCustomRepository(DocumentRepository, organizationConnectionName)
+            const document = await repository.findOne(value) 
+            return Boolean(document)
+          }
+        })
+        .test({
+          message: 'Proof is already used in another entry',
+          test: async (value, context) => {
+            if (!value) return true
+            const { organizationConnectionName } = context.schema
+            const repository = getCustomRepository(EntryRepository, organizationConnectionName)
+            const document = await repository.findOne({ invoice_id: value }) 
             return !Boolean(document)
           }
         }),
@@ -49,7 +72,7 @@ export class EntryController {
       
       const { organizationConnectionName } = request as any
 
-      schema.fields.document_id['organizationConnectionName'] = organizationConnectionName
+      schema.fields.invoice_id['organizationConnectionName'] = organizationConnectionName
 
       try {
         await schema.validate(request.body, schemaConfig)
@@ -64,7 +87,8 @@ export class EntryController {
         value, 
         code, 
         payed,
-        document_id,
+        invoice_id,
+        proof_id,
       } = schema.cast(request.body)
 
       
@@ -140,7 +164,8 @@ export class EntryController {
         value,
         code,
         payed,
-        document_id,
+        invoice_id,
+        proof_id,
       })
       
       await entryRepository.save(newEntry)
@@ -214,11 +239,11 @@ export class EntryController {
         value: yup.number().nullable(),
         code: yup.string().nullable().optional(),
         payed: yup.boolean().optional(),
-        document_id: yup.string().uuid()
+        invoice_id: yup.string().uuid()
           .nullable()
           .optional()
           .test({
-          message: 'Document not found',
+          message: 'Invoice not found',
           test: async (value, context) => {
             if (!value) return true
             const { organizationConnectionName } = context.schema
@@ -228,20 +253,43 @@ export class EntryController {
           }
         })
         .test({
-          message: 'document is already used in another entry',
+          message: 'Invoice is already used in another entry',
           test: async (value, context) => {
             if (!value) return true
             const { organizationConnectionName, id } = context.schema
             const repository = getCustomRepository(EntryRepository, organizationConnectionName)
-            const document = await repository.findOne({id: Not(id), document_id: value}) 
+            const document = await repository.findOne({ id: Not(id), invoice_id: value }) 
+            return !Boolean(document)
+          }
+        }),
+        proof_id: yup.string().uuid()
+          .nullable()
+          .optional()
+          .test({
+          message: 'Proof not found',
+          test: async (value, context) => {
+            if (!value) return true
+            const { organizationConnectionName } = context.schema
+            const repository = getCustomRepository(DocumentRepository, organizationConnectionName)
+            const document = await repository.findOne(value) 
+            return Boolean(document)
+          }
+        })
+        .test({
+          message: 'Proof is already used in another entry',
+          test: async (value, context) => {
+            if (!value) return true
+            const { organizationConnectionName, id } = context.schema
+            const repository = getCustomRepository(EntryRepository, organizationConnectionName)
+            const document = await repository.findOne({ id: Not(id), proof_id: value }) 
             return !Boolean(document)
           }
         }),
       }).noUnknown().test(myNoUnknownTest)
       
       
-      schema.fields.document_id['organizationConnectionName'] = organizationConnectionName
-      schema.fields.document_id['id'] = id
+      schema.fields.invoice_id['organizationConnectionName'] = organizationConnectionName
+      schema.fields.invoice_id['id'] = id
 
       try {
         yup.string().uuid().validateSync(id)
